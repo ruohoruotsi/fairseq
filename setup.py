@@ -42,7 +42,9 @@ setup(
     install_requires=[
         'cffi',
         'numpy',
-        'torch',
+        'sacrebleu',
+        # don't include torch, to support both release and nightly builds
+        #'torch',
         'tqdm',
     ],
     packages=find_packages(exclude=['scripts', 'tests']),

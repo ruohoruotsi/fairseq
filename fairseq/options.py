@@ -108,10 +108,6 @@ def parse_args_and_arch(parser, input_args=None, parse_known=False):
         extra = None
 
     # Post-process args.
-    if hasattr(args, 'lr'):
-        args.lr = eval_str_list(args.lr, type=float)
-    if hasattr(args, 'update_freq'):
-        args.update_freq = eval_str_list(args.update_freq, type=int)
     if hasattr(args, 'max_sentences_valid') and args.max_sentences_valid is None:
         args.max_sentences_valid = args.max_sentences
     if getattr(args, 'memory_efficient_fp16', False):
@@ -142,6 +138,9 @@ def get_parser(desc, default_task='translation'):
                         help='log progress every N batches (when progress bar is disabled)')
     parser.add_argument('--log-format', default=None, help='log format to use',
                         choices=['json', 'none', 'simple', 'tqdm'])
+    parser.add_argument('--tensorboard-logdir', metavar='DIR', default='',
+                        help='path to save logs for tensorboard, should match --logdir '
+                        'of running tensorboard (default: no tensorboard logging)')
     parser.add_argument('--seed', default=1, type=int, metavar='N',
                         help='pseudo random number generator seed')
     parser.add_argument('--cpu', action='store_true', help='use CPU instead of CUDA')
@@ -154,6 +153,10 @@ def get_parser(desc, default_task='translation'):
                         help='number of updates before increasing loss scale')
     parser.add_argument('--fp16-scale-tolerance', default=0.0, type=float,
                         help='pct of updates that can overflow before decreasing the loss scale')
+    parser.add_argument('--min-loss-scale', default=1e-4, type=float, metavar='D',
+                        help='minimum FP16 loss scale, after which training is stopped')
+    parser.add_argument('--threshold-loss-scale', type=float,
+                        help='threshold FP16 loss scale from below')
     parser.add_argument('--user-dir', default=None,
                         help='path to a python module containing custom extensions (tasks and/or architectures)')
 
@@ -283,14 +286,16 @@ def add_optimization_args(parser):
     group.add_argument('--sentence-avg', action='store_true',
                        help='normalize gradients by the number of sentences in a batch'
                             ' (default is to normalize by number of tokens)')
-    group.add_argument('--update-freq', default='1', metavar='N',
+    group.add_argument('--update-freq', default='1', metavar='N1,N2,...,N_K',
+                       type=lambda uf: eval_str_list(uf, type=int),
                        help='update parameters every N_i batches, when in epoch i')
 
     # Optimizer definitions can be found under fairseq/optim/
     group.add_argument('--optimizer', default='nag', metavar='OPT',
                        choices=OPTIMIZER_REGISTRY.keys(),
                        help='Optimizer')
-    group.add_argument('--lr', '--learning-rate', default='0.25', metavar='LR_1,LR_2,...,LR_N',
+    group.add_argument('--lr', '--learning-rate', default='0.25', type=eval_str_list,
+                       metavar='LR_1,LR_2,...,LR_N',
                        help='learning rate for the first N epochs; all epochs >N using LR_N'
                             ' (note: this may be interpreted differently depending on --lr-scheduler)')
     group.add_argument('--momentum', default=0.99, type=float, metavar='M',
@@ -306,8 +311,6 @@ def add_optimization_args(parser):
                        help='learning rate shrink factor for annealing, lr_new = (lr * lr_shrink)')
     group.add_argument('--min-lr', default=1e-5, type=float, metavar='LR',
                        help='minimum learning rate')
-    group.add_argument('--min-loss-scale', default=1e-4, type=float, metavar='D',
-                       help='minimum loss scale (for FP16 training)')
     # fmt: on
     return group
 
